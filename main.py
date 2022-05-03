@@ -8,7 +8,8 @@ from discord.ext import commands
 from dislash import slash_commands, Option, OptionType
 from datetime import datetime, timedelta
 import os
-import re
+import time
+from gtts import gTTS
 
 client = commands.Bot(command_prefix='/')
 slash = slash_commands.SlashClient(client)
@@ -24,14 +25,14 @@ async def on_ready():
 #VC参加
 @slash.command(
     name = 'join',
-    description = '現在参加中のVCに接続',
+    description = '現在参加中のボイスチャンネルに接続',
 )
 async def join(inter):
     now = datetime.utcnow() + timedelta(hours=9)
     await inter.reply('wait...')
 
-    if inter.author.voice is None:
-        error_embed = discord.Embed(title=f"Error {now:%m/%d-%H:%M}",description="現在ボイスチャンネルに接続されていません",color=discord.Colour.red())
+    if inter.author.voice == None:
+        error_embed = discord.Embed(title=f"Error {now:%y-%m-%d-%H:%M:%S}",description="現在ボイスチャンネルに接続されていません",color=discord.Colour.red())
         await client.get_channel(inter.channel.id).send(embed=error_embed)
     
     await inter.author.voice.channel.connect()
@@ -39,24 +40,46 @@ async def join(inter):
 #VC退出
 @slash.command(
     name = 'exit',
-    description = '現在参加中のVCから切断',
+    description = '現在参加中のボイスチャンネルから切断',
 )
 async def exit(inter):
     now = datetime.utcnow() + timedelta(hours=9)
     await inter.reply('wait...')
 
-    if inter.guild.voice_client is None:
-        error_embed = discord.Embed(title=f"Error {now:%m/%d-%H:%M}",description="現在ボイスチャンネルに接続されていません",color=discord.Colour.red())
+    if inter.guild.voice_client == None:
+        error_embed = discord.Embed(title=f"Error {now:%y-%m-%d-%H:%M:%S}",description="現在ボイスチャンネルに接続されていません",color=discord.Colour.red())
         await client.get_channel(inter.channel.id).send(embed=error_embed)
         return
     await inter.guild.voice_client.disconnect()
+
+speak_list = {}
+@client.event
+async def on_message(message): 
+    #print(message)
+
+    #VCに参加してたら読み上げ
+    if message.guild.voice_client != None:
+        print(f"[{message.author.name}]{message.channel.id}:{message.content}")
+        #配列に追加
+        #key : channel_id
+        #value : message_content
+        speak_list[message.channel.id] = message.content
+
+        now = datetime.utcnow() + timedelta(hours=9)
+
+        #該当idのメッセージを読み上げ
+        tts = gTTS(speak_list[message.channel.id], lang='ja', slow=False)
+        tts.save(f"{os.getcwd()}/voice/gtts_{message.channel.id}.mp3")
+        #読み上げ
+        message.guild.voice_client.play(discord.FFmpegPCMAudio(f"{os.getcwd()}/voice/gtts_{message.channel.id}.mp3"))
+
 
 #VC参加通知
 @client.event
 async def on_voice_state_update(member, before, after): 
     if before.channel != after.channel:
         now = datetime.utcnow() + timedelta(hours=9)
-        if before.channel is None:
+        if before.channel == None:
             #全てのチャンネルを取得
             all_ch = client.get_all_channels()
             
@@ -77,17 +100,17 @@ async def on_voice_state_update(member, before, after):
             if len(send_ch_list) == 0:
                 #VCと同一カテゴリー内にテキストチャンネルが存在しない場合
                 send_ch = client.get_channel(act_send_ch_list[-1])
-                join_embed = discord.Embed(title=f"{after.channel.name} へ参加",description=f"{now:%m/%d-%H:%M} に {member.name} が {after.channel.name} に参加しました。",color=discord.Colour.green())
+                join_embed = discord.Embed(title=f"{after.channel.name} へ参加",description=f"{now:%y-%m-%d-%H:%M:%S} に {member.name} が {after.channel.name} に参加しました。",color=discord.Colour.green())
                 await send_ch.send(embed=join_embed)
             else:
                 #VCと同一カテゴリー内にテキストチャンネルが存在する場合
                 send_ch = client.get_channel(send_ch_list[0])
-                join_embed = discord.Embed(title=f"{after.channel.name} へ参加",description=f"{now:%m/%d-%H:%M} に {member.name} が {after.channel.name} に参加しました。",color=discord.Colour.green())
+                join_embed = discord.Embed(title=f"{after.channel.name} へ参加",description=f"{now:%y-%m-%d-%H:%M:%S} に {member.name} が {after.channel.name} に参加しました。",color=discord.Colour.green())
                 await send_ch.send(embed=join_embed)
 
             
 
-        elif after.channel is None:
+        elif after.channel == None:
             #全てのチャンネルを取得
             all_ch = client.get_all_channels()
 
@@ -108,12 +131,12 @@ async def on_voice_state_update(member, before, after):
             if len(send_ch_list) == 0:
                 #VCと同一カテゴリー内にテキストチャンネルが存在しない場合
                 send_ch = client.get_channel(act_send_ch_list[-1])
-                exit_embed = discord.Embed(title=f"{before.channel.name} から退出",description=f"{now:%m/%d-%H:%M} に {member.name} が {before.channel.name} から退出しました",color=discord.Colour.red())
+                exit_embed = discord.Embed(title=f"{before.channel.name} から退出",description=f"{now:%y-%m-%d-%H:%M:%S} に {member.name} が {before.channel.name} から退出しました",color=discord.Colour.red())
                 await send_ch.send(embed=exit_embed)
             else:
                 #VCと同一カテゴリー内にテキストチャンネルが存在する場合
                 send_ch = client.get_channel(send_ch_list[0])
-                exit_embed = discord.Embed(title=f"{before.channel.name} から退出",description=f"{now:%m/%d-%H:%M} に {member.name} が {before.channel.name} から退出しました",color=discord.Colour.red())
+                exit_embed = discord.Embed(title=f"{before.channel.name} から退出",description=f"{now:%y-%m-%d-%H:%M:%S} に {member.name} が {before.channel.name} から退出しました",color=discord.Colour.red())
                 await send_ch.send(embed=exit_embed)
 
 client.run(config.discord_token)
