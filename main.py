@@ -1,5 +1,4 @@
 # coding: utf-8
-from asyncio.windows_events import NULL
 from itertools import count
 from config import config
 import asyncio
@@ -8,8 +7,9 @@ from discord.ext import commands
 from dislash import slash_commands, Option, OptionType
 from datetime import datetime, timedelta
 import os
-import time
+import random
 from gtts import gTTS
+import re
 
 client = commands.Bot(command_prefix='/')
 slash = slash_commands.SlashClient(client)
@@ -63,7 +63,9 @@ async def on_message(message):
         #配列に追加
         #key : channel_id
         #value : message_content
-        speak_list[message.channel.id] = message.content
+
+        speak_text = re.sub(r'https?:\/\/.*[\r\n]*', 'URL省略',message.content, flags=re.MULTILINE)
+        speak_list[message.channel.id] = speak_text
 
         now = datetime.utcnow() + timedelta(hours=9)
 
@@ -73,6 +75,31 @@ async def on_message(message):
         #読み上げ
         message.guild.voice_client.play(discord.FFmpegPCMAudio(f"{os.getcwd()}/voice/gtts_{message.channel.id}.mp3"))
 
+#VC参加者をチーム分け
+@slash.command(
+    name = 'team',
+    description = 'ボイスチャンネルに参加している人をチームに分ける',
+    options = [
+        Option('party_num', 'チーム数', OptionType.STRING),
+    ]
+)
+async def team(inter, party_num=None):
+    if party_num != None:
+        if str.isdecimal(party_num):
+            team = []
+            #参加中のメンバーをランダムに並べ替え
+            members = [i.name for i in inter.author.voice.channel.members]
+            random.shuffle(members)
+            #生成
+            for i in range(int(party_num)):
+                team.append("🔔チーム" + str(i+1))
+                team.extend(members[i:len(members):int(party_num)])
+            #送信
+            await inter.reply(f"✅{party_num}個のチームを生成しました\n\n" + "\n".join(team))
+        else:
+            await inter.reply("❌チーム数は半角数字で入力してください")
+    else:
+        await inter.reply("❌チーム数を入力してください")
 
 #VC参加通知
 @client.event
